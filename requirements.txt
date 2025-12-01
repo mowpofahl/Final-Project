@@ -1,0 +1,8 @@
+requests
+sqlite3
+matplotlib
+seaborn
+plotly
+beautifulsoup4
+scipy
+scikit-learn
