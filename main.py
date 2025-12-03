@@ -12,13 +12,13 @@ from visualizations.visualize import generate_visualizations
 
 
 def main():
+    # Ensure the database schema exists before inserting data
+    store_data_in_db()
+
     # Fetch data from APIs
     fetch_air_quality_data()   # Fetch air quality data
     fetch_health_data()        # Fetch health data
     fetch_weather_data()       # Fetch weather data
-
-    # Store fetched data in the database
-    store_data_in_db()
 
     # Perform calculations
     calculate_pollution_health()          # Pollution-health correlation

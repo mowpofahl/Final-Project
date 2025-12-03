@@ -3,18 +3,67 @@ import sqlite3
 DB_FILE = "project.db"
 
 
+def _table_has_column(cursor, table_name, column_name):
+    cursor.execute(f"PRAGMA table_info({table_name})")
+    return any(row[1] == column_name for row in cursor.fetchall())
+
+
 def create_db():
     """
-    This function creates the SQLite database and the necessary tables for storing data.
+    Create or migrate the SQLite database so string fields are normalized into ID tables.
+    Existing tables that are missing the new normalized columns are dropped and recreated.
     """
     conn = sqlite3.connect(DB_FILE)
+    conn.execute("PRAGMA foreign_keys = ON")
     cursor = conn.cursor()
 
-    # Create tables for air quality, health data, and weather data
+    if not _table_has_column(cursor, 'air_quality', 'city_id'):
+        cursor.execute('DROP TABLE IF EXISTS air_quality')
+    if not _table_has_column(cursor, 'weather_data', 'city_id'):
+        cursor.execute('DROP TABLE IF EXISTS weather_data')
+    if not _table_has_column(cursor, 'weather_data', 'weather_condition_id'):
+        cursor.execute('DROP TABLE IF EXISTS weather_data')
+    if not _table_has_column(cursor, 'health_data', 'state_id'):
+        cursor.execute('DROP TABLE IF EXISTS health_data')
+
+    cursor.execute(
+        '''
+        CREATE TABLE IF NOT EXISTS states (
+            id INTEGER PRIMARY KEY,
+            name TEXT UNIQUE
+        )
+    '''
+    )
+
+    cursor.execute(
+        '''
+        CREATE TABLE IF NOT EXISTS cities (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            state_id INTEGER,
+            country TEXT,
+            latitude REAL,
+            longitude REAL,
+            UNIQUE(name, state_id, country),
+            FOREIGN KEY(state_id) REFERENCES states(id)
+        )
+    '''
+    )
+
+    cursor.execute(
+        '''
+        CREATE TABLE IF NOT EXISTS weather_conditions (
+            id INTEGER PRIMARY KEY,
+            description TEXT UNIQUE
+        )
+    '''
+    )
+
     cursor.execute(
         '''
         CREATE TABLE IF NOT EXISTS air_quality (
             id INTEGER PRIMARY KEY,
+            city_id INTEGER NOT NULL,
             aqi INTEGER,
             pm25 REAL,
             pm10 REAL,
@@ -22,10 +71,8 @@ def create_db():
             no2 REAL,
             so2 REAL,
             o3 REAL,
-            lat REAL,
-            lon REAL,
-            city TEXT,
-            timestamp INTEGER
+            timestamp INTEGER,
+            FOREIGN KEY(city_id) REFERENCES cities(id)
         )
     '''
     )
@@ -34,10 +81,11 @@ def create_db():
         '''
         CREATE TABLE IF NOT EXISTS health_data (
             id INTEGER PRIMARY KEY,
-            state TEXT,
+            state_id INTEGER,
             asthma_rate REAL,
             copd_rate REAL,
-            year INTEGER
+            year INTEGER,
+            FOREIGN KEY(state_id) REFERENCES states(id)
         )
     '''
     )
@@ -46,15 +94,15 @@ def create_db():
         '''
         CREATE TABLE IF NOT EXISTS weather_data (
             id INTEGER PRIMARY KEY,
+            city_id INTEGER NOT NULL,
             temperature REAL,
             humidity REAL,
             wind_speed REAL,
             pressure REAL,
-            weather_description TEXT,
-            lat REAL,
-            lon REAL,
-            city TEXT,
-            timestamp INTEGER
+            weather_condition_id INTEGER,
+            timestamp INTEGER,
+            FOREIGN KEY(city_id) REFERENCES cities(id),
+            FOREIGN KEY(weather_condition_id) REFERENCES weather_conditions(id)
         )
     '''
     )

@@ -3,14 +3,20 @@ from bs4 import BeautifulSoup
 
 from db.db_operations import store_health_data
 
-URL = "https://www.cdc.gov/nchs/data/uis/morbidity_prevalence_asthma.htm"  # Example URL
+URL = "https://www.cdc.gov/nchs/data/nhis/earlyrelease/ER_aia.htm"  # Example placeholder URL
 
 
 def fetch_health_data():
     """
     Fetch health data using BeautifulSoup from a CDC webpage.
     """
-    response = requests.get(URL)
+    try:
+        response = requests.get(URL, timeout=30)
+        response.raise_for_status()
+    except requests.RequestException as exc:
+        print(f"Failed to fetch health data: {exc}")
+        return
+
     soup = BeautifulSoup(response.text, 'html.parser')
 
     # Extract data (adjust according to actual page structure)

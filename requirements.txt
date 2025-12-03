@@ -1,5 +1,4 @@
 requests
-sqlite3
 matplotlib
 seaborn
 plotly

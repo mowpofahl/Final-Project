@@ -1,18 +1,23 @@
 import requests
 
+from api.fetch_air_quality import get_city_coordinates, load_cities
 from db.db_operations import store_weather_data
 
-API_KEY = "your_api_key_here"
-BASE_URL = "http://api.openweathermap.org/data/2.5/weather"
+API_KEY = "dbe0b483577a3246e7265d2b8270db24"
+BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
 
 
 def fetch_weather_data():
     """
     Fetch weather data from OpenWeather API.
     """
-    cities = ["Detroit", "Ann Arbor", "Chicago"]  # Example cities
+    cities = load_cities()
     for city in cities:
-        params = {'q': city, 'appid': API_KEY}
+        location = get_city_coordinates(city)
+        if not location:
+            continue
+
+        params = {'lat': location['lat'], 'lon': location['lon'], 'appid': API_KEY}
         response = requests.get(BASE_URL, params=params)
         if response.status_code == 200:
             data = response.json()
@@ -21,8 +26,6 @@ def fetch_weather_data():
             wind_speed = data['wind']['speed']
             pressure = data['main']['pressure']
             weather_description = data['weather'][0]['description']
-            lat = data['coord']['lat']
-            lon = data['coord']['lon']
             timestamp = data['dt']
 
             # Store data in the database
@@ -32,10 +35,12 @@ def fetch_weather_data():
                 wind_speed,
                 pressure,
                 weather_description,
-                lat,
-                lon,
-                city,
+                location['lat'],
+                location['lon'],
+                location['name'],
+                location.get('state'),
+                location.get('country'),
                 timestamp,
             )
         else:
-            print(f"Failed to fetch weather data for {city}")
+            print(f"Failed to fetch weather data for {city}: {response.status_code} {response.text}")
