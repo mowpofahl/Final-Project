@@ -5,3 +5,5 @@ plotly
 beautifulsoup4
 scipy
 scikit-learn
+pandas
+openpyxl

@@ -3,95 +3,70 @@ from pathlib import Path
 
 import requests
 
-from db.db_operations import store_air_quality_data
+from db.db_operations import get_ingestion_index, store_air_quality_data, update_ingestion_index
 
 API_KEY = "dbe0b483577a3246e7265d2b8270db24"
 BASE_URL = "https://api.openweathermap.org/data/2.5/air_pollution"
-GEOCODE_URL = "https://api.openweathermap.org/geo/1.0/direct"
-CITIES_FILE = Path(__file__).resolve().parents[1] / "config" / "cities.json"
-DEFAULT_CITIES = ["Detroit,MI,USA", "Ann Arbor,MI,USA", "Chicago,IL,USA"]
+COUNTIES_FILE = Path(__file__).resolve().parents[1] / "config" / "counties.json"
+MAX_ROWS_PER_RUN = 25
 
 
-def load_cities():
+def load_counties():
     """
-    Load the list of cities from config/cities.json.
-    Falls back to DEFAULT_CITIES if the file is missing or invalid.
+    Load Colorado county metadata (lat/lon, FIPS) for API calls.
     """
     try:
-        with open(CITIES_FILE, 'r', encoding='utf-8') as file:
+        with open(COUNTIES_FILE, 'r', encoding='utf-8') as file:
             data = json.load(file)
-            if isinstance(data, list) and data:
-                return data
-            print("City config is empty; using default cities.")
+            if not isinstance(data, list):
+                raise ValueError("counties.json must contain a list of county definitions.")
+            return data
     except FileNotFoundError:
-        print("cities.json not found; using default cities.")
-    except json.JSONDecodeError:
-        print("cities.json is invalid; using default cities.")
-    return DEFAULT_CITIES
-
-
-def get_city_coordinates(city):
-    """
-    Use OpenWeather's Geocoding API to convert a city string into coordinates and metadata.
-    Returns a dict containing latitude, longitude, canonical city name, state, and country.
-    """
-    params = {'q': city, 'limit': 1, 'appid': API_KEY}
-    response = requests.get(GEOCODE_URL, params=params)
-    if response.status_code == 200:
-        data = response.json()
-        if data:
-            location = data[0]
-            return {
-                'name': location.get('name', city),
-                'state': location.get('state'),
-                'country': location.get('country'),
-                'lat': location.get('lat'),
-                'lon': location.get('lon'),
-            }
-        print(f"No geocoding results for {city}.")
-    else:
-        print(f"Failed to geocode {city}: {response.status_code} {response.text}")
-    return None
+        raise FileNotFoundError("config/counties.json is missing; add Colorado counties to fetch data.")
 
 
 def fetch_air_quality_data():
     """
-    Fetch air quality data from OpenWeather API.
+    Fetch air quality data from OpenWeather API for a limited batch of counties.
     """
-    cities = load_cities()
-    for city in cities:
-        location = get_city_coordinates(city)
-        if not location:
-            continue
+    counties = load_counties()
+    if not counties:
+        print("No counties configured; skipping air quality fetch.")
+        return
 
-        params = {'lat': location['lat'], 'lon': location['lon'], 'appid': API_KEY}
-        response = requests.get(BASE_URL, params=params)
+    last_index = get_ingestion_index('air_quality')
+    start_index = (last_index + 1) % len(counties)
+    processed = 0
+    idx = start_index
+    visited = 0
+
+    while processed < MAX_ROWS_PER_RUN and visited < len(counties):
+        county = counties[idx]
+        params = {'lat': county['lat'], 'lon': county['lon'], 'appid': API_KEY}
+        response = requests.get(BASE_URL, params=params, timeout=30)
         if response.status_code == 200:
-            data = response.json()
-            aqi = data['list'][0]['main']['aqi']
-            pm25 = data['list'][0]['components']['pm2_5']
-            pm10 = data['list'][0]['components']['pm10']
-            co = data['list'][0]['components']['co']
-            no2 = data['list'][0]['components']['no2']
-            so2 = data['list'][0]['components']['so2']
-            o3 = data['list'][0]['components']['o3']
-            timestamp = data['list'][0]['dt']
-
-            # Store data in the database
+            payload = response.json()['list'][0]
             store_air_quality_data(
-                aqi,
-                pm25,
-                pm10,
-                co,
-                no2,
-                so2,
-                o3,
-                location['lat'],
-                location['lon'],
-                location['name'],
-                location.get('state'),
-                location.get('country'),
-                timestamp,
+                county_name=county['county'],
+                state_name=county['state'],
+                fips=county['fips'],
+                latitude=county['lat'],
+                longitude=county['lon'],
+                aqi=payload['main']['aqi'],
+                pm25=payload['components']['pm2_5'],
+                pm10=payload['components']['pm10'],
+                co=payload['components']['co'],
+                no2=payload['components']['no2'],
+                so2=payload['components']['so2'],
+                o3=payload['components']['o3'],
+                timestamp=payload['dt'],
             )
+            processed += 1
         else:
-            print(f"Failed to fetch data for {city}: {response.status_code} {response.text}")
+            print(f"Air quality request failed for {county['county']} County: {response.status_code} {response.text}")
+
+        idx = (idx + 1) % len(counties)
+        visited += 1
+
+    final_index = (idx - 1) % len(counties)
+    update_ingestion_index('air_quality', final_index)

@@ -1,0 +1,72 @@
+[
+  {
+    "county": "Adams",
+    "state": "Colorado",
+    "fips": "08001",
+    "lat": 39.839,
+    "lon": -104.193
+  },
+  {
+    "county": "Arapahoe",
+    "state": "Colorado",
+    "fips": "08005",
+    "lat": 39.649,
+    "lon": -104.336
+  },
+  {
+    "county": "Boulder",
+    "state": "Colorado",
+    "fips": "08013",
+    "lat": 40.093,
+    "lon": -105.358
+  },
+  {
+    "county": "Denver",
+    "state": "Colorado",
+    "fips": "08031",
+    "lat": 39.739,
+    "lon": -104.984
+  },
+  {
+    "county": "Douglas",
+    "state": "Colorado",
+    "fips": "08035",
+    "lat": 39.331,
+    "lon": -104.932
+  },
+  {
+    "county": "El Paso",
+    "state": "Colorado",
+    "fips": "08041",
+    "lat": 38.910,
+    "lon": -104.472
+  },
+  {
+    "county": "Jefferson",
+    "state": "Colorado",
+    "fips": "08059",
+    "lat": 39.580,
+    "lon": -105.266
+  },
+  {
+    "county": "Larimer",
+    "state": "Colorado",
+    "fips": "08069",
+    "lat": 40.669,
+    "lon": -105.594
+  },
+  {
+    "county": "Pueblo",
+    "state": "Colorado",
+    "fips": "08101",
+    "lat": 38.167,
+    "lon": -104.472
+  },
+  {
+    "county": "Weld",
+    "state": "Colorado",
+    "fips": "08123",
+    "lat": 40.392,
+    "lon": -104.715
+  }
+]

@@ -3,58 +3,47 @@ import sqlite3
 DB_FILE = "project.db"
 
 
-def _table_has_column(cursor, table_name, column_name):
-    cursor.execute(f"PRAGMA table_info({table_name})")
-    return any(row[1] == column_name for row in cursor.fetchall())
-
-
 def create_db():
     """
-    Create or migrate the SQLite database so string fields are normalized into ID tables.
-    Existing tables that are missing the new normalized columns are dropped and recreated.
+    Create or migrate the SQLite database for the Colorado county-centric project.
     """
     conn = sqlite3.connect(DB_FILE)
     conn.execute("PRAGMA foreign_keys = ON")
     cursor = conn.cursor()
 
-    if not _table_has_column(cursor, 'air_quality', 'city_id'):
-        cursor.execute('DROP TABLE IF EXISTS air_quality')
-    if not _table_has_column(cursor, 'weather_data', 'city_id'):
-        cursor.execute('DROP TABLE IF EXISTS weather_data')
-    if not _table_has_column(cursor, 'weather_data', 'weather_condition_id'):
-        cursor.execute('DROP TABLE IF EXISTS weather_data')
-    if not _table_has_column(cursor, 'health_data', 'state_id'):
-        cursor.execute('DROP TABLE IF EXISTS health_data')
-
     cursor.execute(
-        '''
-        CREATE TABLE IF NOT EXISTS states (
-            id INTEGER PRIMARY KEY,
-            name TEXT UNIQUE
-        )
-    '''
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='counties'"
     )
+    schema_ready = cursor.fetchone() is not None
+
+    if not schema_ready:
+        # Legacy tables are dropped so we can rebuild a normalized county-centric schema.
+        cursor.execute('DROP TABLE IF EXISTS air_quality')
+        cursor.execute('DROP TABLE IF EXISTS weather_data')
+        cursor.execute('DROP TABLE IF EXISTS health_data')
+        cursor.execute('DROP TABLE IF EXISTS cities')
+        cursor.execute('DROP TABLE IF EXISTS states')
+        cursor.execute('DROP TABLE IF EXISTS weather_conditions')
 
     cursor.execute(
         '''
-        CREATE TABLE IF NOT EXISTS cities (
+        CREATE TABLE IF NOT EXISTS counties (
             id INTEGER PRIMARY KEY,
             name TEXT NOT NULL,
-            state_id INTEGER,
-            country TEXT,
+            state TEXT NOT NULL,
+            fips TEXT UNIQUE,
             latitude REAL,
             longitude REAL,
-            UNIQUE(name, state_id, country),
-            FOREIGN KEY(state_id) REFERENCES states(id)
+            UNIQUE(name, state)
         )
     '''
     )
 
     cursor.execute(
         '''
-        CREATE TABLE IF NOT EXISTS weather_conditions (
-            id INTEGER PRIMARY KEY,
-            description TEXT UNIQUE
+        CREATE TABLE IF NOT EXISTS ingestion_state (
+            source TEXT PRIMARY KEY,
+            last_index INTEGER NOT NULL DEFAULT -1
         )
     '''
     )
@@ -63,7 +52,7 @@ def create_db():
         '''
         CREATE TABLE IF NOT EXISTS air_quality (
             id INTEGER PRIMARY KEY,
-            city_id INTEGER NOT NULL,
+            county_id INTEGER NOT NULL,
             aqi INTEGER,
             pm25 REAL,
             pm10 REAL,
@@ -72,7 +61,7 @@ def create_db():
             so2 REAL,
             o3 REAL,
             timestamp INTEGER,
-            FOREIGN KEY(city_id) REFERENCES cities(id)
+            FOREIGN KEY(county_id) REFERENCES counties(id)
         )
     '''
     )
@@ -81,11 +70,15 @@ def create_db():
         '''
         CREATE TABLE IF NOT EXISTS health_data (
             id INTEGER PRIMARY KEY,
-            state_id INTEGER,
+            county_id INTEGER NOT NULL,
             asthma_rate REAL,
-            copd_rate REAL,
+            lower_ci REAL,
+            upper_ci REAL,
+            visits INTEGER,
+            gender TEXT,
             year INTEGER,
-            FOREIGN KEY(state_id) REFERENCES states(id)
+            UNIQUE(county_id, gender, year),
+            FOREIGN KEY(county_id) REFERENCES counties(id)
         )
     '''
     )
@@ -94,15 +87,14 @@ def create_db():
         '''
         CREATE TABLE IF NOT EXISTS weather_data (
             id INTEGER PRIMARY KEY,
-            city_id INTEGER NOT NULL,
+            county_id INTEGER NOT NULL,
             temperature REAL,
             humidity REAL,
             wind_speed REAL,
             pressure REAL,
-            weather_condition_id INTEGER,
             timestamp INTEGER,
-            FOREIGN KEY(city_id) REFERENCES cities(id),
-            FOREIGN KEY(weather_condition_id) REFERENCES weather_conditions(id)
+            description TEXT,
+            FOREIGN KEY(county_id) REFERENCES counties(id)
         )
     '''
     )
