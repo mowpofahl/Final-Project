@@ -7,13 +7,13 @@ DB_FILE = "project.db"
 
 def calculate_pollution_forecasting(verbose=True):
     """
-    Produce a simple moving-average AQI forecast per county and compare against the latest asthma rate.
+    Produce a simple moving-average PM2.5 forecast per county and compare against the latest asthma rate.
     """
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute(
         '''
-        SELECT c.name, a.timestamp, a.aqi
+        SELECT c.name, a.timestamp, a.pm25
         FROM air_quality a
         JOIN counties c ON c.id = a.county_id
         ORDER BY c.name, a.timestamp
@@ -37,10 +37,10 @@ def calculate_pollution_forecasting(verbose=True):
     latest_health = {county: (year, rate) for county, year, rate in health_rows if rate is not None}
 
     series = defaultdict(list)
-    for county, timestamp, aqi in pollution_rows:
-        if aqi is None:
+    for county, timestamp, pm25 in pollution_rows:
+        if pm25 is None:
             continue
-        series[county].append((timestamp, aqi))
+        series[county].append((timestamp, pm25))
 
     forecasts = []
     for county, entries in series.items():
@@ -56,21 +56,21 @@ def calculate_pollution_forecasting(verbose=True):
         forecasts.append(
             {
                 'county': county,
-                'forecast_aqi': forecast,
-                'latest_aqi': latest_value,
+                'forecast_pm25': forecast,
+                'latest_pm25': latest_value,
                 'delta': delta,
                 'latest_asthma_rate': health_info[1] if health_info else None,
                 'asthma_year': health_info[0] if health_info else None,
             }
         )
 
-    forecasts.sort(key=lambda entry: entry['forecast_aqi'], reverse=True)
+    forecasts.sort(key=lambda entry: entry['forecast_pm25'], reverse=True)
     if verbose:
-        print("Projected AQI levels (3-sample moving average):")
+        print("Projected PM2.5 levels (3-sample moving average):")
         for entry in forecasts[:5]:
             print(
-                f"{entry['county']}: forecast AQI {entry['forecast_aqi']:.1f} "
-                f"(last {entry['latest_aqi']:.1f}, Δ {entry['delta']:.1f}, "
+                f"{entry['county']}: forecast PM2.5 {entry['forecast_pm25']:.2f} "
+                f"(last {entry['latest_pm25']:.2f}, Δ {entry['delta']:.2f}, "
                 f"asthma {entry['latest_asthma_rate'] or 'n/a'} in {entry['asthma_year'] or 'n/a'})"
             )
     return forecasts

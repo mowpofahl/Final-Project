@@ -1,4 +1,5 @@
 import io
+import random
 import re
 from urllib.parse import parse_qs, urljoin, urlparse
 
@@ -11,6 +12,7 @@ from db.db_operations import get_ingestion_index, store_health_data, update_inge
 URL = "https://coepht.colorado.gov/asthma-data"
 STATE_NAME = "Colorado"
 MAX_ROWS_PER_RUN = 25
+_SHUFFLE_SEED = 2024
 
 
 def _parse_float(value):
@@ -144,6 +146,9 @@ def fetch_health_data():
     if not records:
         print("No asthma rows detected in the downloaded workbook.")
         return
+
+    rng = random.Random(_SHUFFLE_SEED)
+    rng.shuffle(records)
 
     last_index = get_ingestion_index('health')
     next_index = last_index + 1

@@ -1,5 +1,5 @@
 import sqlite3
-from collections import Counter
+from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
 
@@ -9,6 +9,7 @@ import seaborn as sns
 
 from calculations.health_data_correlation import calculate_health_data_correlation
 from calculations.health_insights import compute_yoy_changes, load_health_dataframe
+from calculations.pollution_weather import calculate_pollution_weather
 
 DB_FILE = Path(__file__).resolve().parents[1] / "project.db"
 OUTPUT_DIR = Path(__file__).resolve().parents[1] / "visualizations" / "output"
@@ -30,6 +31,47 @@ def _fetch_dataframe(query, columns, params=()):
     if not rows:
         return pd.DataFrame(columns=columns)
     return pd.DataFrame(rows, columns=columns)
+
+
+def _load_pm_health_dataframe():
+    return _fetch_dataframe(
+        '''
+        WITH pm AS (
+            SELECT
+                county_id,
+                AVG(pm25) AS avg_pm25
+            FROM air_quality
+            GROUP BY county_id
+        )
+        SELECT
+            c.name AS county,
+            pm.avg_pm25,
+            h.asthma_rate,
+            h.year AS health_year
+        FROM pm
+        JOIN counties c ON c.id = pm.county_id
+        LEFT JOIN (
+            SELECT county_id, year, asthma_rate
+            FROM health_data
+            WHERE (county_id, year) IN (
+                SELECT county_id, MAX(year) FROM health_data GROUP BY county_id
+            )
+        ) AS h ON h.county_id = pm.county_id
+    ''',
+        columns=["county", "avg_pm25", "asthma_rate", "health_year"],
+    )
+
+
+def _load_pm_time_series():
+    return _fetch_dataframe(
+        '''
+        SELECT c.name AS county, a.timestamp, a.pm25
+        FROM air_quality a
+        JOIN counties c ON c.id = a.county_id
+        ORDER BY c.name, a.timestamp
+    ''',
+        columns=["county", "timestamp", "pm25"],
+    )
 
 
 def _format_timestamp(ts):
@@ -232,47 +274,186 @@ def _plot_visits_vs_rate(health_df):
     plt.close(fig)
 
 
-def _plot_yoy_change_lollipops(health_df):
-    yoy = compute_yoy_changes(health_df)
-    if yoy.empty:
-        print("Skipping year-over-year change plot (insufficient data).")
+def _plot_pm_vs_asthma(pm_df):
+    if pm_df.empty:
+        print("Skipping PM vs asthma plot (no overlapping data).")
         return
 
-    yoy["year"] = yoy["year"].astype(int)
-    yoy["abs_change"] = yoy["yoy_change"].abs()
-    top_counties = (
-        yoy.groupby("county")["abs_change"]
-        .max()
+    pm_df = pm_df.dropna(subset=["avg_pm25", "asthma_rate"])
+    pm_df = pm_df[pm_df["asthma_rate"] > 0]
+    if pm_df.empty:
+        print("Skipping PM vs asthma plot (no overlapping data).")
+        return
+
+    fig, ax = plt.subplots(figsize=(9, 6))
+    sns.scatterplot(data=pm_df, x="avg_pm25", y="asthma_rate", hue="county", ax=ax)
+    ax.set_title("Average PM2.5 vs asthma rate by county-year")
+    ax.set_xlabel("Avg PM2.5 (µg/m³)")
+    ax.set_ylabel("Asthma rate")
+    ax.legend(loc="best", fontsize="small")
+    fig.tight_layout()
+    fig.savefig(OUTPUT_DIR / "pm_vs_asthma.png")
+    plt.close(fig)
+
+
+def _plot_pm_trends(pm_series_df):
+    if pm_series_df.empty:
+        print("Skipping PM trend plot (no PM data).")
+        return
+
+    pm_series_df = pm_series_df.dropna(subset=["pm25"])
+    if pm_series_df.empty:
+        print("Skipping PM trend plot (no PM data).")
+        return
+
+    pm_series_df["datetime"] = pd.to_datetime(pm_series_df["timestamp"], unit="s")
+    coverage = (
+        pm_series_df.groupby("county")["datetime"]
+        .nunique()
         .sort_values(ascending=False)
-        .head(5)
-        .index.tolist()
     )
-    subset = yoy[yoy["county"].isin(top_counties)]
-    if subset.empty:
-        print("Skipping year-over-year change plot (no qualifying counties).")
+    top_counties = coverage.head(3).index.tolist()
+    if not top_counties:
+        print("Skipping PM trend plot (insufficient county coverage).")
         return
 
-    fig, axes = plt.subplots(len(top_counties), 1, figsize=(10, 3.5 * len(top_counties)), sharex=True)
+    fig, axes = plt.subplots(len(top_counties), 1, figsize=(9, 4 * len(top_counties)), sharex=True)
     if len(top_counties) == 1:
         axes = [axes]
-    palette = sns.color_palette("tab10")
-    gender_colors = {gender: palette[idx % len(palette)] for idx, gender in enumerate(sorted(subset["gender"].unique()))}
 
     for county, ax in zip(top_counties, axes):
-        county_data = subset[subset["county"] == county].sort_values("year")
-        ax.axhline(0, color="black", linewidth=0.8, linestyle="--")
-        for gender, group in county_data.groupby("gender"):
-            color = gender_colors[gender]
-            ax.vlines(group["year"], 0, group["yoy_change"], colors=color, linewidth=1.5)
-            ax.scatter(group["year"], group["yoy_change"], color=color, s=45, label=gender)
-        ax.set_title(f"{county}: YoY asthma rate change")
-        ax.set_ylabel("Δ rate")
-        ax.grid(True, axis="y", alpha=0.2)
-    axes[-1].set_xlabel("Year")
-    handles, labels = axes[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="upper right", title="Gender")
+        subset = pm_series_df[pm_series_df["county"] == county].sort_values("datetime")
+        ax.plot(subset["datetime"], subset["pm25"], color="tab:green", marker="o")
+        ax.set_ylabel("PM2.5 (µg/m³)")
+        ax.set_title(f"{county}: PM2.5 readings over time")
+        ax.grid(True, axis="y", alpha=0.3)
+    axes[-1].set_xlabel("Timestamp")
+
     fig.tight_layout()
-    fig.savefig(OUTPUT_DIR / "yoy_change_lollipop.png")
+    fig.savefig(OUTPUT_DIR / "pm_trends.png")
+    plt.close(fig)
+
+
+def _plot_pm_seasonal_heatmap():
+    rows = _fetch_rows(
+        '''
+        SELECT
+            c.name,
+            CAST(strftime('%m', datetime(a.timestamp, 'unixepoch')) AS INTEGER) AS month,
+            a.pm25
+        FROM air_quality a
+        JOIN counties c ON c.id = a.county_id
+    '''
+    )
+    if not rows:
+        print("Skipping PM seasonal heatmap (no air quality data).")
+        return
+
+    season_map = {
+        12: "Winter",
+        1: "Winter",
+        2: "Winter",
+        3: "Spring",
+        4: "Spring",
+        5: "Spring",
+        6: "Summer",
+        7: "Summer",
+        8: "Summer",
+        9: "Fall",
+        10: "Fall",
+        11: "Fall",
+    }
+    seasonal = defaultdict(lambda: defaultdict(list))
+    for county, month, pm25 in rows:
+        season = season_map.get(month)
+        if season and pm25 is not None:
+            seasonal[county][season].append(pm25)
+
+    data = []
+    for county, seasons in seasonal.items():
+        averages = {season: sum(values) / len(values) for season, values in seasons.items()}
+        averages["county"] = county
+        data.append(averages)
+
+    if not data:
+        print("Skipping PM seasonal heatmap (insufficient coverage).")
+        return
+
+    df = pd.DataFrame(data).set_index("county")
+    seasons = ["Winter", "Spring", "Summer", "Fall"]
+    df = df.reindex(columns=seasons, fill_value=float("nan")).fillna(0.0)
+
+    fig, ax = plt.subplots(figsize=(8, max(4, len(df) * 0.4)))
+    sns.heatmap(df, annot=True, fmt=".2f", cmap="YlOrRd", ax=ax)
+    ax.set_title("Average PM2.5 by season and county")
+    ax.set_xlabel("Season")
+    ax.set_ylabel("County")
+    fig.tight_layout()
+    fig.savefig(OUTPUT_DIR / "pm_seasonal_heatmap.png")
+    plt.close(fig)
+
+
+def _plot_pm_weather_correlations():
+    data = calculate_pollution_weather(verbose=False)
+    if not data:
+        print("Skipping PM-weather correlation plot (no paired samples).")
+        return
+
+    df = pd.DataFrame(data)
+    if df.empty:
+        print("Skipping PM-weather correlation plot (no correlated counties).")
+        return
+    melted = df.melt(
+        id_vars=["county"],
+        value_vars=["temp_corr", "humidity_corr", "wind_corr"],
+        var_name="metric",
+        value_name="correlation",
+    )
+    melted["correlation"] = melted["correlation"].fillna(0.0)
+    metric_labels = {
+        "temp_corr": "Temperature",
+        "humidity_corr": "Humidity",
+        "wind_corr": "Wind Speed",
+    }
+    melted["metric"] = melted["metric"].map(metric_labels)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sns.barplot(data=melted, x="county", y="correlation", hue="metric", ax=ax)
+    ax.axhline(0, color="black", linewidth=0.8)
+    ax.set_title("PM2.5 correlation with weather metrics")
+    ax.set_xlabel("County")
+    ax.set_ylabel("Pearson correlation")
+    ax.legend(title="Metric")
+    fig.tight_layout()
+    fig.savefig(OUTPUT_DIR / "pm_weather_correlations.png")
+    plt.close(fig)
+
+
+def _plot_pm_forecast():
+    forecasts = calculate_pollution_forecasting(verbose=False)
+    if not forecasts:
+        print("Skipping PM forecast chart (insufficient PM history).")
+        return
+
+    df = pd.DataFrame(forecasts)
+    df = df.sort_values("forecast_pm25", ascending=False).head(8)
+    melted = df.melt(
+        id_vars=["county"],
+        value_vars=["forecast_pm25", "latest_pm25"],
+        var_name="metric",
+        value_name="value",
+    )
+    metric_labels = {"forecast_pm25": "Forecast", "latest_pm25": "Latest"}
+    melted["metric"] = melted["metric"].map(metric_labels)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sns.barplot(data=melted, x="county", y="value", hue="metric", ax=ax)
+    ax.set_title("Projected vs latest PM2.5 (3-sample moving average)")
+    ax.set_xlabel("County")
+    ax.set_ylabel("PM2.5 (µg/m³)")
+    ax.legend(title="")
+    fig.tight_layout()
+    fig.savefig(OUTPUT_DIR / "pm_forecast.png")
     plt.close(fig)
 
 
@@ -350,9 +531,9 @@ def generate_visualizations():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     display_recent_batches()
     health_df = load_health_dataframe()
+    pm_health_df = _load_pm_health_dataframe()
     _plot_asthma_trends(health_df)
-    _plot_county_profiles(health_df)
     _plot_gender_heatmap(health_df)
     _plot_visits_vs_rate(health_df)
-    _plot_yoy_change_lollipops(health_df)
-    _plot_health_similarity_heatmap()
+    _plot_pm_vs_asthma(pm_health_df)
+    _plot_pm_weather_correlations()

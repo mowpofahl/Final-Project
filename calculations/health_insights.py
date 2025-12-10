@@ -26,6 +26,8 @@ def load_health_dataframe():
     '''
     df = pd.read_sql_query(query, conn)
     conn.close()
+    if not df.empty:
+        df = df[df["asthma_rate"].notna() & (df["asthma_rate"] > 0)]
     return df
 
 

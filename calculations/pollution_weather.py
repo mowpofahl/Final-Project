@@ -9,7 +9,7 @@ MAX_TIME_DIFF_SECONDS = 3600  # pair measurements captured within one hour
 
 def calculate_pollution_weather(verbose=True):
     """
-    Correlate AQI with temperature, humidity, and wind speed for each Colorado county.
+    Correlate PM2.5 with temperature, humidity, and wind speed for each Colorado county.
     """
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
@@ -18,7 +18,7 @@ def calculate_pollution_weather(verbose=True):
         SELECT
             c.name,
             a.timestamp,
-            a.aqi,
+            a.pm25,
             w.temperature,
             w.humidity,
             w.wind_speed,
@@ -34,31 +34,34 @@ def calculate_pollution_weather(verbose=True):
     rows = cursor.fetchall()
     conn.close()
 
-    series = defaultdict(lambda: {'aqi': [], 'temp': [], 'humidity': [], 'wind': []})
-    for county, _ts, aqi, temp, humidity, wind_speed, _pressure in rows:
-        if None in (aqi, temp, humidity, wind_speed):
+    series = defaultdict(lambda: {'pm25': [], 'temp': [], 'humidity': [], 'wind': []})
+    for county, _ts, pm25, temp, humidity, wind_speed, _pressure in rows:
+        if None in (pm25, temp, humidity, wind_speed):
             continue
-        series[county]['aqi'].append(aqi)
+        series[county]['pm25'].append(pm25)
         series[county]['temp'].append(temp)
         series[county]['humidity'].append(humidity)
         series[county]['wind'].append(wind_speed)
 
     correlations = []
     for county, metrics in series.items():
-        if len(metrics['aqi']) < 5:
+        if len(metrics['pm25']) < 5:
             continue
 
         def correlate(values):
+            pm_values = metrics['pm25']
+            if len(set(pm_values)) <= 1 or len(set(values)) <= 1:
+                return 0.0
             try:
-                corr, _ = pearsonr(metrics['aqi'], values)
+                corr, _ = pearsonr(pm_values, values)
                 return corr
             except Exception:
-                return float('nan')
+                return 0.0
 
         correlations.append(
             {
                 'county': county,
-                'observations': len(metrics['aqi']),
+                'observations': len(metrics['pm25']),
                 'temp_corr': correlate(metrics['temp']),
                 'humidity_corr': correlate(metrics['humidity']),
                 'wind_corr': correlate(metrics['wind']),
@@ -67,7 +70,7 @@ def calculate_pollution_weather(verbose=True):
 
     correlations.sort(key=lambda entry: abs(entry['temp_corr']) if entry['temp_corr'] == entry['temp_corr'] else 0, reverse=True)
     if verbose:
-        print("Pollution-weather correlations (AQI vs metric):")
+        print("Pollution-weather correlations (PM2.5 vs metric):")
         for entry in correlations[:5]:
             print(
                 f"{entry['county']} - temp {entry['temp_corr']:.2f}, "
