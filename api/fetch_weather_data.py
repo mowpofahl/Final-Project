@@ -1,7 +1,7 @@
 import requests
 
 from api.fetch_air_quality import load_counties
-from db.db_operations import get_ingestion_index, store_weather_data, update_ingestion_index
+from db.db_operations import store_weather_data
 
 API_KEY = "dbe0b483577a3246e7265d2b8270db24"
 BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
@@ -18,14 +18,10 @@ def fetch_weather_data():
         print("No counties configured; skipping weather fetch.")
         return
 
-    last_index = get_ingestion_index('weather')
-    start_index = (last_index + 1) % len(counties)
     processed = 0
-    idx = start_index
-    visited = 0
-
-    while processed < MAX_ROWS_PER_RUN and visited < len(counties):
-        county = counties[idx]
+    for county in counties:
+        if processed >= MAX_ROWS_PER_RUN:
+            break
         params = {'lat': county['lat'], 'lon': county['lon'], 'appid': API_KEY, 'units': 'imperial'}
         response = requests.get(BASE_URL, params=params, timeout=30)
         if response.status_code == 200:
@@ -46,9 +42,5 @@ def fetch_weather_data():
             processed += 1
         else:
             print(f"Weather request failed for {county['county']} County: {response.status_code} {response.text}")
-
-        idx = (idx + 1) % len(counties)
-        visited += 1
-
-    final_index = (idx - 1) % len(counties)
-    update_ingestion_index('weather', final_index)
+    if processed == 0:
+        print("No new weather rows were inserted (all requested snapshots already existed).")

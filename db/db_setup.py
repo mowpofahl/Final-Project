@@ -5,25 +5,14 @@ DB_FILE = "project.db"
 
 def create_db():
     """
-    Create or migrate the SQLite database for the Colorado county-centric project.
+    Keep the database schema ready for storing API data.
     """
     conn = sqlite3.connect(DB_FILE)
     conn.execute("PRAGMA foreign_keys = ON")
     cursor = conn.cursor()
 
-    cursor.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='counties'"
-    )
-    schema_ready = cursor.fetchone() is not None
-
-    if not schema_ready:
-        # Legacy tables are dropped so we can rebuild a normalized county-centric schema.
-        cursor.execute('DROP TABLE IF EXISTS air_quality')
-        cursor.execute('DROP TABLE IF EXISTS weather_data')
-        cursor.execute('DROP TABLE IF EXISTS health_data')
-        cursor.execute('DROP TABLE IF EXISTS cities')
-        cursor.execute('DROP TABLE IF EXISTS states')
-        cursor.execute('DROP TABLE IF EXISTS weather_conditions')
+    # ingestion_state is no longer needed now that inserts rely on UNIQUE constraints.
+    cursor.execute('DROP TABLE IF EXISTS ingestion_state')
 
     cursor.execute(
         '''
@@ -41,15 +30,6 @@ def create_db():
 
     cursor.execute(
         '''
-        CREATE TABLE IF NOT EXISTS ingestion_state (
-            source TEXT PRIMARY KEY,
-            last_index INTEGER NOT NULL DEFAULT -1
-        )
-    '''
-    )
-
-    cursor.execute(
-        '''
         CREATE TABLE IF NOT EXISTS air_quality (
             id INTEGER PRIMARY KEY,
             county_id INTEGER NOT NULL,
@@ -61,6 +41,7 @@ def create_db():
             so2 REAL,
             o3 REAL,
             timestamp INTEGER,
+            UNIQUE(county_id, timestamp),
             FOREIGN KEY(county_id) REFERENCES counties(id)
         )
     '''
@@ -94,6 +75,7 @@ def create_db():
             pressure REAL,
             timestamp INTEGER,
             description TEXT,
+            UNIQUE(county_id, timestamp),
             FOREIGN KEY(county_id) REFERENCES counties(id)
         )
     '''

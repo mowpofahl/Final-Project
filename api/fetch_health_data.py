@@ -7,7 +7,7 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
-from db.db_operations import get_ingestion_index, store_health_data, update_ingestion_index
+from db.db_operations import store_health_data
 
 URL = "https://coepht.colorado.gov/asthma-data"
 STATE_NAME = "Colorado"
@@ -152,16 +152,10 @@ def fetch_health_data():
     rng = random.Random(_SHUFFLE_SEED)
     rng.shuffle(records)
 
-    last_index = get_ingestion_index('health')
-    next_index = last_index + 1
-    if next_index >= len(records):
-        print("All available health records have already been ingested.")
-        return
-
     inserted = 0
-    idx = next_index
-    while idx < len(records) and inserted < MAX_ROWS_PER_RUN:
-        record = records[idx]
+    for record in records:
+        if inserted >= MAX_ROWS_PER_RUN:
+            break
         success = store_health_data(
             county_name=record['county'],
             state_name=STATE_NAME,
@@ -175,10 +169,8 @@ def fetch_health_data():
         )
         if success:
             inserted += 1
-        idx += 1
 
-    update_ingestion_index('health', min(idx - 1, len(records) - 1))
     if inserted == 0:
         print("No new health records were inserted; database may already be up to date.")
     else:
-        print(f"Inserted {inserted} new health records (through index {idx - 1}).")
+        print(f"Inserted {inserted} new health records.")

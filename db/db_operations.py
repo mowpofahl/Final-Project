@@ -42,30 +42,6 @@ def _get_or_create_county(cursor, county_name, state_name, fips=None, latitude=N
     return cursor.lastrowid
 
 
-def get_ingestion_index(source_name):
-    conn = _get_connection()
-    cursor = conn.cursor()
-    cursor.execute('SELECT last_index FROM ingestion_state WHERE source = ?', (source_name,))
-    row = cursor.fetchone()
-    conn.close()
-    return row[0] if row else -1
-
-
-def update_ingestion_index(source_name, last_index):
-    conn = _get_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        '''
-        INSERT INTO ingestion_state(source, last_index)
-        VALUES (?, ?)
-        ON CONFLICT(source) DO UPDATE SET last_index = excluded.last_index
-    ''',
-        (source_name, last_index),
-    )
-    conn.commit()
-    conn.close()
-
-
 def store_air_quality_data(
     county_name,
     state_name,
@@ -86,7 +62,7 @@ def store_air_quality_data(
     county_id = _get_or_create_county(cursor, county_name, state_name, fips, latitude, longitude)
     cursor.execute(
         '''
-        INSERT INTO air_quality (
+        INSERT OR IGNORE INTO air_quality (
             county_id,
             aqi,
             pm25,
@@ -156,7 +132,7 @@ def store_weather_data(
     county_id = _get_or_create_county(cursor, county_name, state_name, fips, latitude, longitude)
     cursor.execute(
         '''
-        INSERT INTO weather_data (
+        INSERT OR IGNORE INTO weather_data (
             county_id,
             temperature,
             humidity,

@@ -8,7 +8,7 @@ DB_FILE = "project.db"
 
 def calculate_health_data_correlation(verbose=True):
     """
-    Compute pairwise correlations between counties based on multi-year asthma rates.
+    Computes correlations between counties based on multi-year asthma rates.
     """
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()

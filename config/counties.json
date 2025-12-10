@@ -68,5 +68,110 @@
     "fips": "08123",
     "lat": 40.392,
     "lon": -104.715
+  },
+  {
+    "county": "Alamosa",
+    "state": "Colorado",
+    "fips": "08003",
+    "lat": 37.470,
+    "lon": -105.870
+  },
+  {
+    "county": "Archuleta",
+    "state": "Colorado",
+    "fips": "08007",
+    "lat": 37.270,
+    "lon": -107.020
+  },
+  {
+    "county": "Broomfield",
+    "state": "Colorado",
+    "fips": "08014",
+    "lat": 39.920,
+    "lon": -105.053
+  },
+  {
+    "county": "Chaffee",
+    "state": "Colorado",
+    "fips": "08015",
+    "lat": 38.535,
+    "lon": -106.134
+  },
+  {
+    "county": "Eagle",
+    "state": "Colorado",
+    "fips": "08037",
+    "lat": 39.655,
+    "lon": -106.828
+  },
+  {
+    "county": "Fremont",
+    "state": "Colorado",
+    "fips": "08043",
+    "lat": 38.442,
+    "lon": -105.244
+  },
+  {
+    "county": "Garfield",
+    "state": "Colorado",
+    "fips": "08045",
+    "lat": 39.551,
+    "lon": -107.324
+  },
+  {
+    "county": "Grand",
+    "state": "Colorado",
+    "fips": "08049",
+    "lat": 40.073,
+    "lon": -106.112
+  },
+  {
+    "county": "La Plata",
+    "state": "Colorado",
+    "fips": "08067",
+    "lat": 37.275,
+    "lon": -107.880
+  },
+  {
+    "county": "Logan",
+    "state": "Colorado",
+    "fips": "08075",
+    "lat": 40.624,
+    "lon": -103.207
+  },
+  {
+    "county": "Mesa",
+    "state": "Colorado",
+    "fips": "08077",
+    "lat": 39.020,
+    "lon": -108.476
+  },
+  {
+    "county": "Montezuma",
+    "state": "Colorado",
+    "fips": "08083",
+    "lat": 37.350,
+    "lon": -108.585
+  },
+  {
+    "county": "Morgan",
+    "state": "Colorado",
+    "fips": "08087",
+    "lat": 40.250,
+    "lon": -103.800
+  },
+  {
+    "county": "Pitkin",
+    "state": "Colorado",
+    "fips": "08097",
+    "lat": 39.191,
+    "lon": -106.817
+  },
+  {
+    "county": "Routt",
+    "state": "Colorado",
+    "fips": "08107",
+    "lat": 40.485,
+    "lon": -106.831
   }
 ]
