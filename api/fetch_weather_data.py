@@ -12,6 +12,7 @@ def fetch_weather_data():
     """
     Fetch weather data from OpenWeather API for a limited batch of Colorado counties.
     """
+    # Reuse the same county metadata so air and weather stay aligned.
     counties = load_counties()
     if not counties:
         print("No counties configured; skipping weather fetch.")

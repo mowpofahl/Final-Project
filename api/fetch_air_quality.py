@@ -29,6 +29,7 @@ def fetch_air_quality_data():
     """
     Fetch air quality data from OpenWeather API for a limited batch of counties.
     """
+    # We keep walking the counties list so every run picks up where the last one left off.
     counties = load_counties()
     if not counties:
         print("No counties configured; skipping air quality fetch.")
@@ -43,6 +44,7 @@ def fetch_air_quality_data():
     while processed < MAX_ROWS_PER_RUN and visited < len(counties):
         county = counties[idx]
         params = {'lat': county['lat'], 'lon': county['lon'], 'appid': API_KEY}
+        # Grabbing a single snapshot for this county (OpenWeather only returns the latest reading).
         response = requests.get(BASE_URL, params=params, timeout=30)
         if response.status_code == 200:
             payload = response.json()['list'][0]

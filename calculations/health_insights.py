@@ -27,6 +27,7 @@ def load_health_dataframe():
     df = pd.read_sql_query(query, conn)
     conn.close()
     if not df.empty:
+        # The state site uses 0 as a placeholder for suppressed values, so drop those upfront.
         df = df[df["asthma_rate"].notna() & (df["asthma_rate"] > 0)]
     return df
 
@@ -42,6 +43,7 @@ def summarize_county_profiles(df=None, verbose=True):
             print("No health data available for county summaries.")
         return pd.DataFrame(columns=["county", "avg_rate", "median_rate", "avg_visits", "records"])
 
+    # Quick county snapshot so we can shout out where asthma is consistently high.
     agg = (
         df.groupby("county")
         .agg(
@@ -66,6 +68,7 @@ def compute_yoy_changes(df=None):
     if df.empty:
         return pd.DataFrame(columns=["county", "gender", "year", "yoy_change"])
 
+    # Sort so diff() actually compares each county/gender year to the prior year.
     df = df.sort_values(["county", "gender", "year"])
     df["yoy_change"] = df.groupby(["county", "gender"])["asthma_rate"].diff()
     changes = df.dropna(subset=["yoy_change"])[["county", "gender", "year", "yoy_change"]]
@@ -81,6 +84,7 @@ def summarize_asthma_trends(df=None, verbose=True):
 
     results = []
     for (county, gender), group in df.groupby(["county", "gender"]):
+        # Treat each county/gender like a mini time series and estimate a slope.
         group = group.sort_values("year")
         years = group["year"].unique()
         if len(years) < 2:
@@ -153,18 +157,21 @@ def summarize_visits_rate_relationship(df=None, verbose=True):
     for county, group in df.groupby("county"):
         if group["visits"].nunique() < 2 or group["asthma_rate"].nunique() < 2 or len(group) < 4:
             continue
+        # Simple Pearson is fine here since we're just checking if busy counties trend higher.
         corr = group["visits"].corr(group["asthma_rate"])
         if pd.notna(corr):
             results.append({"county": county, "corr": corr, "records": len(group)})
 
+    if not results:
+        if verbose:
+            print("Insufficient variability for visits vs rate correlations.")
+        return pd.DataFrame(columns=["county", "corr", "records"])
+
     corr_df = pd.DataFrame(results).sort_values("corr", ascending=False)
     if verbose:
-        if corr_df.empty:
-            print("Insufficient variability for visits vs rate correlations.")
-        else:
-            print("Visits vs asthma rate correlations:")
-            for _, row in corr_df.head(5).iterrows():
-                print(f"{row['county']}: corr={row['corr']:.2f} ({row['records']} records)")
+        print("Visits vs asthma rate correlations:")
+        for _, row in corr_df.head(5).iterrows():
+            print(f"{row['county']}: corr={row['corr']:.2f} ({row['records']} records)")
     return corr_df
 
 

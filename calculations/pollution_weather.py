@@ -45,7 +45,7 @@ def calculate_pollution_weather(verbose=True):
 
     correlations = []
     for county, metrics in series.items():
-        if len(metrics['pm25']) < 5:
+        if len(metrics['pm25']) < 2:
             continue
 
         def correlate(values):

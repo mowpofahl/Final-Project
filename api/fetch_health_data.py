@@ -72,6 +72,7 @@ def fetch_health_data():
     """
     Download Colorado asthma data and insert ≤25 new rows per run.
     """
+    # Grab the landing page first so we can follow the Google Drive link they hide in there.
     try:
         response = requests.get(URL, timeout=30)
         response.raise_for_status()
@@ -93,6 +94,7 @@ def fetch_health_data():
     file_id = _extract_drive_file_id(download_href)
     download_url = f"https://drive.google.com/uc?export=download&id={file_id}" if file_id else download_href
 
+    # Pull down the giant Excel file and turn it into a DataFrame we can filter.
     try:
         file_response = requests.get(download_url, timeout=60)
         file_response.raise_for_status()
