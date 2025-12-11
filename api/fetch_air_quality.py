@@ -57,7 +57,7 @@ def fetch_air_quality_data():
                 no2=payload['components']['no2'],
                 so2=payload['components']['so2'],
                 o3=payload['components']['o3'],
-                timestamp=payload['dt'],
+                observed_at=payload['dt'],
             )
             processed += 1
         else:

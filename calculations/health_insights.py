@@ -1,8 +1,9 @@
 import sqlite3
+from pathlib import Path
 
 import pandas as pd
 
-DB_FILE = "project.db"
+DB_FILE = Path(__file__).resolve().parents[1] / "project.db"
 
 
 def load_health_dataframe():

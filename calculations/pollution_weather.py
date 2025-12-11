@@ -1,9 +1,10 @@
 import sqlite3
+from pathlib import Path
 from collections import defaultdict
 
 from scipy.stats import pearsonr
 
-DB_FILE = "project.db"
+DB_FILE = Path(__file__).resolve().parents[1] / "project.db"
 MAX_TIME_DIFF_SECONDS = 3600  # pair measurements captured within one hour
 
 
@@ -17,7 +18,7 @@ def calculate_pollution_weather(verbose=True):
         f'''
         SELECT
             c.name,
-            a.timestamp,
+            a.observed_at,
             a.pm25,
             w.temperature,
             w.humidity,
@@ -26,9 +27,9 @@ def calculate_pollution_weather(verbose=True):
         FROM air_quality a
         JOIN weather_data w
             ON a.county_id = w.county_id
-           AND ABS(a.timestamp - w.timestamp) <= {MAX_TIME_DIFF_SECONDS}
+           AND ABS(a.observed_at - w.observed_at) <= {MAX_TIME_DIFF_SECONDS}
         JOIN counties c ON c.id = a.county_id
-        ORDER BY c.name, a.timestamp
+        ORDER BY c.name, a.observed_at
     '''
     )
     rows = cursor.fetchall()

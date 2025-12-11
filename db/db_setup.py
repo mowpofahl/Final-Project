@@ -1,6 +1,16 @@
 import sqlite3
+from pathlib import Path
 
-DB_FILE = "project.db"
+DB_FILE = Path(__file__).resolve().parents[1] / "project.db"
+
+
+def _ensure_column(cursor, table, column_name, definition):
+    cursor.execute(f"PRAGMA table_info({table})")
+    columns = [row[1] for row in cursor.fetchall()]
+    if column_name in columns:
+        return False
+    cursor.execute(f"ALTER TABLE {table} ADD COLUMN {definition}")
+    return True
 
 
 def create_db():
@@ -10,9 +20,6 @@ def create_db():
     conn = sqlite3.connect(DB_FILE)
     conn.execute("PRAGMA foreign_keys = ON")
     cursor = conn.cursor()
-
-    # ingestion_state is no longer needed now that inserts rely on UNIQUE constraints.
-    cursor.execute('DROP TABLE IF EXISTS ingestion_state')
 
     cursor.execute(
         '''
@@ -41,6 +48,7 @@ def create_db():
             so2 REAL,
             o3 REAL,
             timestamp INTEGER,
+            observed_at INTEGER,
             UNIQUE(county_id, timestamp),
             FOREIGN KEY(county_id) REFERENCES counties(id)
         )
@@ -64,6 +72,10 @@ def create_db():
     '''
     )
 
+    air_added = _ensure_column(cursor, 'air_quality', 'observed_at', 'INTEGER')
+    if air_added:
+        cursor.execute('UPDATE air_quality SET observed_at = timestamp WHERE observed_at IS NULL')
+
     cursor.execute(
         '''
         CREATE TABLE IF NOT EXISTS weather_data (
@@ -74,12 +86,17 @@ def create_db():
             wind_speed REAL,
             pressure REAL,
             timestamp INTEGER,
+            observed_at INTEGER,
             description TEXT,
             UNIQUE(county_id, timestamp),
             FOREIGN KEY(county_id) REFERENCES counties(id)
         )
     '''
     )
+
+    weather_added = _ensure_column(cursor, 'weather_data', 'observed_at', 'INTEGER')
+    if weather_added:
+        cursor.execute('UPDATE weather_data SET observed_at = timestamp WHERE observed_at IS NULL')
 
     conn.commit()
     conn.close()

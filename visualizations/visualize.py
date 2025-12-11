@@ -65,12 +65,12 @@ def _load_pm_health_dataframe():
 def _load_pm_time_series():
     return _fetch_dataframe(
         '''
-        SELECT c.name AS county, a.timestamp, a.pm25
+        SELECT c.name AS county, a.observed_at, a.pm25
         FROM air_quality a
         JOIN counties c ON c.id = a.county_id
-        ORDER BY c.name, a.timestamp
+        ORDER BY c.name, a.observed_at
     ''',
-        columns=["county", "timestamp", "pm25"],
+        columns=["county", "observed_at", "pm25"],
     )
 
 
@@ -110,7 +110,7 @@ def display_recent_batches():
             '''
             SELECT aq.id, c.name, _ts, aq.aqi, aq.pm25, aq.pm10
             FROM (
-                SELECT id, county_id, aqi, pm25, pm10, timestamp AS _ts
+                SELECT id, county_id, aqi, pm25, pm10, observed_at AS _ts
                 FROM air_quality
                 ORDER BY id DESC
                 LIMIT 25
@@ -118,15 +118,15 @@ def display_recent_batches():
             JOIN counties c ON c.id = aq.county_id
             ORDER BY aq.id DESC
         ''',
-            ("ID", "County", "Timestamp (UTC)", "AQI", "PM2.5", "PM10"),
+            ("ID", "County", "Observed (UTC)", "AQI", "PM2.5", "PM10"),
             [2],
         ),
         (
             "Weather - Latest 25",
             '''
-            SELECT w.id, c.name, w.timestamp, w.temperature, w.humidity, w.wind_speed
+            SELECT w.id, c.name, w._ts, w.temperature, w.humidity, w.wind_speed
             FROM (
-                SELECT id, county_id, temperature, humidity, wind_speed, timestamp
+                SELECT id, county_id, temperature, humidity, wind_speed, observed_at AS _ts
                 FROM weather_data
                 ORDER BY id DESC
                 LIMIT 25
@@ -134,7 +134,7 @@ def display_recent_batches():
             JOIN counties c ON c.id = w.county_id
             ORDER BY w.id DESC
         ''',
-            ("ID", "County", "Timestamp (UTC)", "Temp (F)", "Humidity", "Wind (mph)"),
+            ("ID", "County", "Observed (UTC)", "Temp (F)", "Humidity", "Wind (mph)"),
             [2],
         ),
         (
@@ -314,7 +314,7 @@ def _plot_pm_trends(pm_series_df):
         print("Skipping PM trend plot (no PM data).")
         return
 
-    pm_series_df["datetime"] = pd.to_datetime(pm_series_df["timestamp"], unit="s")
+    pm_series_df["datetime"] = pd.to_datetime(pm_series_df["observed_at"], unit="s")
     coverage = (
         pm_series_df.groupby("county")["datetime"]
         .nunique()
@@ -347,7 +347,7 @@ def _plot_pm_seasonal_heatmap():
         '''
         SELECT
             c.name,
-            CAST(strftime('%m', datetime(a.timestamp, 'unixepoch')) AS INTEGER) AS month,
+            CAST(strftime('%m', datetime(a.observed_at, 'unixepoch')) AS INTEGER) AS month,
             a.pm25
         FROM air_quality a
         JOIN counties c ON c.id = a.county_id
@@ -525,7 +525,7 @@ def _plot_pm_vs_wind():
         FROM air_quality a
         JOIN weather_data w
           ON w.county_id = a.county_id
-         AND ABS(a.timestamp - w.timestamp) <= 900
+         AND ABS(a.observed_at - w.observed_at) <= 900
         JOIN counties c ON c.id = a.county_id
         WHERE a.pm25 IS NOT NULL AND w.wind_speed IS NOT NULL
     ''',

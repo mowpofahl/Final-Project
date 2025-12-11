@@ -1,7 +1,8 @@
 import sqlite3
+from pathlib import Path
 from collections import defaultdict
 
-DB_FILE = "project.db"
+DB_FILE = Path(__file__).resolve().parents[1] / "project.db"
 
 SEASONS = {
     12: "Winter",
@@ -29,8 +30,8 @@ def calculate_seasonal_trends(verbose=True):
         '''
         SELECT
             c.name,
-            CAST(strftime('%Y', datetime(a.timestamp, 'unixepoch')) AS INTEGER) AS year,
-            CAST(strftime('%m', datetime(a.timestamp, 'unixepoch')) AS INTEGER) AS month,
+            CAST(strftime('%Y', datetime(a.observed_at, 'unixepoch')) AS INTEGER) AS year,
+            CAST(strftime('%m', datetime(a.observed_at, 'unixepoch')) AS INTEGER) AS month,
             a.aqi
         FROM air_quality a
         JOIN counties c ON c.id = a.county_id

@@ -1,9 +1,10 @@
 import sqlite3
+from pathlib import Path
 from collections import defaultdict
 
 from scipy.stats import pearsonr
 
-DB_FILE = "project.db"
+DB_FILE = Path(__file__).resolve().parents[1] / "project.db"
 
 
 def calculate_pollution_health(verbose=True):
@@ -17,7 +18,7 @@ def calculate_pollution_health(verbose=True):
         WITH aq AS (
             SELECT
                 county_id,
-                CAST(strftime('%Y', datetime(timestamp, 'unixepoch')) AS INTEGER) AS year,
+                CAST(strftime('%Y', datetime(observed_at, 'unixepoch')) AS INTEGER) AS year,
                 AVG(aqi) AS avg_aqi,
                 AVG(pm25) AS avg_pm25
             FROM air_quality

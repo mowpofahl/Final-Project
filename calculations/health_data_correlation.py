@@ -1,9 +1,10 @@
 import itertools
 import sqlite3
+from pathlib import Path
 
 from scipy.stats import pearsonr
 
-DB_FILE = "project.db"
+DB_FILE = Path(__file__).resolve().parents[1] / "project.db"
 
 
 def calculate_health_data_correlation(verbose=True):

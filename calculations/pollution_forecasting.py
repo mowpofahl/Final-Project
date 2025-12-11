@@ -1,8 +1,9 @@
 import sqlite3
+from pathlib import Path
 from collections import defaultdict
 from statistics import mean
 
-DB_FILE = "project.db"
+DB_FILE = Path(__file__).resolve().parents[1] / "project.db"
 
 
 def calculate_pollution_forecasting(verbose=True):
@@ -13,10 +14,10 @@ def calculate_pollution_forecasting(verbose=True):
     cursor = conn.cursor()
     cursor.execute(
         '''
-        SELECT c.name, a.timestamp, a.pm25
+        SELECT c.name, a.observed_at, a.pm25
         FROM air_quality a
         JOIN counties c ON c.id = a.county_id
-        ORDER BY c.name, a.timestamp
+        ORDER BY c.name, a.observed_at
     '''
     )
     pollution_rows = cursor.fetchall()
@@ -37,10 +38,10 @@ def calculate_pollution_forecasting(verbose=True):
     latest_health = {county: (year, rate) for county, year, rate in health_rows if rate is not None}
 
     series = defaultdict(list)
-    for county, timestamp, pm25 in pollution_rows:
+    for county, observed_at, pm25 in pollution_rows:
         if pm25 is None:
             continue
-        series[county].append((timestamp, pm25))
+        series[county].append((observed_at, pm25))
 
     forecasts = []
     for county, entries in series.items():

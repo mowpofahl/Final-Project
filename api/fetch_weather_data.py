@@ -37,7 +37,7 @@ def fetch_weather_data():
                 wind_speed=payload['wind']['speed'],
                 pressure=payload['main']['pressure'],
                 description=payload['weather'][0]['description'],
-                timestamp=payload['dt'],
+                observed_at=payload['dt'],
             )
             processed += 1
         else:

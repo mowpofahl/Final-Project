@@ -1,8 +1,10 @@
 import sqlite3
+import time
+from pathlib import Path
 
 from db.db_setup import create_db
 
-DB_FILE = "project.db"
+DB_FILE = Path(__file__).resolve().parents[1] / "project.db"
 
 
 def _get_connection():
@@ -55,11 +57,12 @@ def store_air_quality_data(
     no2,
     so2,
     o3,
-    timestamp,
+    observed_at,
 ):
     conn = _get_connection()
     cursor = conn.cursor()
     county_id = _get_or_create_county(cursor, county_name, state_name, fips, latitude, longitude)
+    ingested_at = int(time.time())
     cursor.execute(
         '''
         INSERT OR IGNORE INTO air_quality (
@@ -71,10 +74,11 @@ def store_air_quality_data(
             no2,
             so2,
             o3,
-            timestamp
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            timestamp,
+            observed_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''',
-        (county_id, aqi, pm25, pm10, co, no2, so2, o3, timestamp),
+        (county_id, aqi, pm25, pm10, co, no2, so2, o3, ingested_at, observed_at),
     )
     conn.commit()
     conn.close()
@@ -125,11 +129,12 @@ def store_weather_data(
     wind_speed,
     pressure,
     description,
-    timestamp,
+    observed_at,
 ):
     conn = _get_connection()
     cursor = conn.cursor()
     county_id = _get_or_create_county(cursor, county_name, state_name, fips, latitude, longitude)
+    ingested_at = int(time.time())
     cursor.execute(
         '''
         INSERT OR IGNORE INTO weather_data (
@@ -139,10 +144,11 @@ def store_weather_data(
             wind_speed,
             pressure,
             description,
-            timestamp
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            timestamp,
+            observed_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ''',
-        (county_id, temperature, humidity, wind_speed, pressure, description, timestamp),
+        (county_id, temperature, humidity, wind_speed, pressure, description, ingested_at, observed_at),
     )
     conn.commit()
     conn.close()
